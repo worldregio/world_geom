@@ -2,4 +2,4 @@
 title: "Index"
 ---
 
-This website propose different analysis of the polarisation of world opinion. It is based on a collection of data from the Global Attitude Survey realized by the Pew Research Center from 2002 to present.
+This website propose different sources of geometries for the description of our contemporary world from 1945 to present. It purpose is to propose methods of conversion from one geometry top another one which is not necessary obvious.

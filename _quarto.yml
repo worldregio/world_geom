@@ -3,19 +3,13 @@ project:
   output-dir: docs
 
 website:
-  title: "World Polarisation"
+  title: "World Geometries"
   navbar:
     left:
       - href: index.qmd
         text: "Index"
       - href: author.qmd
         text: "Author"
-      - href: data.qmd
-        text: "Data"
-      - href: explo.qmd
-        text: "Exploration"
-      - href: model.qmd
-        text: "Modelisation"
     right: 
       - icon: github # add icons as navbar buttons
         href: https://github.com/worldregio/pew_opi
