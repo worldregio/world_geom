@@ -12,6 +12,7 @@ library(knitr)
 library(sf)
 library(dplyr)
 library(mapsf)
+library(ggplot2)
 library(cartography)
 library(visNetwork, quietly = TRUE)
 library(widgetframe)
@@ -87,8 +88,6 @@ A more precise and complete databases can be found in the pakage cshape which pr
 
 We will firstly examine the situation of the world in 2019 according to this database.
 
-
-
 ```{r}
 library(cshapes)
 # Situation in 1948
@@ -110,15 +109,13 @@ tab<-st_drop_geometry(map) %>% filter(status=="colony") %>%
 kable(tab, caption = "Territory declared as 'colony' by cshapes")
 ```
 
-We can notice that the number of territorial units is much smaller than in the case of gadm database. Many countries are missing as well as many overseas territories, in particular from UK. The 'colony' that are mentionned are in fact part of nation states (France, USA) that are allowed to participate to national elections and are in practice strongly linked to the nations they belong to. 
-
+We can notice that the number of territorial units is much smaller than in the case of gadm database. Many countries are missing as well as many overseas territories, in particular from UK. The 'colony' that are mentionned are in fact part of nation states (France, USA) that are allowed to participate to national elections and are in practice strongly linked to the nations they belong to.
 
 #### The world of Natural Earth
 
-As third and last example, we can also analyze the world presented in the famous package `rnaturalearth` and the complementary package `rnaturaleathdata`. The map provided by this package are produced by volunteers and coordinated by the North American Cartographic Information Society (NACIS). 
+As third and last example, we can also analyze the world presented in the famous package `rnaturalearth` and the complementary package `rnaturaleathdata`. The map provided by this package are produced by volunteers and coordinated by the North American Cartographic Information Society (NACIS).
 
 ::: {.callout-note collapse="true" title="What is Natural Earth ?"}
-
 *Natural Earth is a public domain map dataset available at 1:10m, 1:50m, and 1:110 million scales. Featuring tightly integrated vector and raster data, with Natural Earth you can make a variety of visually pleasing, well-crafted maps with cartography or GIS software. Natural Earth was built through a collaboration of many volunteers and is supported by NACIS (North American Cartographic Information Society), and is free for use in any type of project (see our Terms of Use page for more information).*
 
 **Source**: [Natural Earth website](https://www.naturalearthdata.com/)
@@ -134,7 +131,6 @@ x<-st_drop_geometry(map) %>% arrange(pop_est) %>% select(name_long, sovereignt, 
 kable(head(x,10))
 
 ```
-
 
 ### Which time period ?
 
@@ -297,3 +293,224 @@ France - as well as UK - are obviously very difficult cases because of the great
 
 **Source** : [Overseas France in English Wikipedia, 9 nov. 2024](https://en.wikipedia.org/wiki/Overseas_France)
 :::
+
+## B. GEOPOLITICAL EDGES
+
+### The example of 2019
+
+#### Map
+
+We start our analysis by the choice of a reference map. We use here a map of 2019 that fit with the information of the trade database 'gravity' from the CEPII and which is made of 233 spatial units from which 194 are states and 39 are dependant territories. This map has been elaborated through a combination of cshapes and gadm sources.
+
+```{r, eval=FALSE}
+
+## Create 2019 map
+## DO NOT RUN
+x<-readRDS("sources/gravity/gravitymap_V5.rds")
+myyear<-2019
+map<-x %>% filter(is.na(last_year) | last_year > myyear ,
+                    is.na(first_year) | first_year < myyear
+                  ) %>%
+            select(country_id, iso3,country,dep=heg_iso3_2020)
+map<-map %>% st_transform("ESRI:54018")
+saveRDS(map,"data/gravity/map2019.RDS")
+```
+
+```{r}
+map<-readRDS("data/gravity/map2019.RDS")
+dep<-map %>% filter(dep !="")
+dep <-st_make_valid(dep) %>% st_centroid()
+dep$dep<-as.factor(dep$dep)
+dep$size=1
+mf_map(map, type="base", col="lightyellow")
+mf_map(dep, type="prop_typo", var=c("size","dep"), inches=0.03, 
+       leg_title = c(NA,"Territories from ..."),leg_val_cex = 0.4, leg_pos = "topleft")
+mf_layout(title = "Geopolitical map of 2019 : 194 states and 39 territories",
+          credits = "Source : Gadm  & Cshapes", frame = T, arrow=F
+          )
+
+```
+
+#### Links
+
+We load now a large set of attributes of links combining flows, size and distance provided by the **gravity database** from CEPII @conte2022. This database is available for all couples of places and has therefore a size of 233\*233 observation as we have 233 vertices.This base is made of 87 indicators that we will not present here in detail but that will be the basis for various method of creation of edges linking states and territories presented below.
+
+```{r, eval=FALSE}
+w<-readRDS("sources/gravity/Gravity_V202211.rds")
+dis<-w %>% filter(year==2019, 
+                  country_exists_o==1, 
+                  country_exists_d==1,
+                  iso3_o %in% map$iso3,
+                  iso3_d %in% map$iso3
+                  )
+saveRDS(dis,"data/gravity/links2019.RDS")
+```
+
+
+```{r}
+links<-readRDS("data/gravity/links2019.RDS")
+```
+
+
+### Contiguity I : Land borders
+
+An apparently simple approach of the problem is to use land borders as criterium of definition of edges linking territories. The gravity database proposes a variable *contig* that seems apparently to fulfill perfectly our expectations.
+
+
+```{r}
+cont<-links %>% select(iso3_o, iso3_d, contig) %>% filter(contig==1)
+kable(head(cont,10), caption = "Extract from the contiguity database of CEPII")
+```
+
+We can produce a map of the number of border for each country of our database.
+
+
+```{r}
+tabcont<-cont %>% group_by(iso3=iso3_o) %>% summarise(nbcont=n())
+mapctr<-st_centroid(map,of_largest_polygon = T)
+mapctr<-mapctr %>% left_join(tabcont) 
+mapctr$nbcont[is.na(mapctr$nbcont)]<-0
+
+mf_map(map, type="base",col="lightyellow")
+mf_map(mapctr,type="prop",col="red",
+       var = "nbcont",
+       symbol = "square",
+       inches=0.05,
+       leg_title = "number of borders",
+       leg_pos = "topleft")
+mf_map(mapctr[mapctr$nbcont==0,], type="base", pch=4, col="blue", add=T, cex=0.6)
+mf_layout(title = "Land borders between countries and territories in 2019",
+          frame=T,
+          credits = "Source : CEPII gravity database",
+          arrow=F)
+```
+
+We observe that 66 countries or territory doesn't have any land borders which creates isolated vertices in large parts of the world. The countries with the greatest number of land borders are Russia (16), China (14), Brazil (10), RD Congo and Germany (9). USA has only two borders, Canada only one and Australia zero. 
+
+```{r}
+distbord<-mapctr %>% st_drop_geometry %>% group_by(nbcont) %>% summarise(n = n())
+ggplot(mapctr) +aes(x=nbcont) + geom_bar() +
+  scale_x_continuous("Number of borders") +
+  scale_y_continuous("Number of countries") +
+  ggtitle("Frequency of borders contiguity in 2019")
+
+```
+
+Even if we eliminate the countries without any land borders, the resulting graph appears not connected and is divided in several components.
+
+```{r, echo=FALSE, eval=FALSE}
+codes<-unique(c(cont$iso3_o,cont$iso3_d))
+nodes<-data.frame(id=codes, label=codes)
+
+edges <- cont %>%
+         filter(iso3_o > iso3_d) %>%
+        select(from = iso3_o, to = iso3_d)
+
+g<-visNetwork(nodes, edges)
+saveRDS(g,"data/gravity/contig_net.RDS")
+```
+
+
+```{r}
+g<-readRDS("data/gravity/contig_net.RDS")
+g
+```
+
+
+### Contiguity II : Sea borders
+
+<to be done>
+
+
+### Distance I : k nearest neighbours
+
+An obvious solution to solve the problem of isolated units could be to use the nearest neighbor method i.e. to compute for each country or territory the distance with other country or territories and keep the k units that are at the lowest distance. Of course, this approach implies two choices that will have an influence on the results :
+
+- the choice of the measure of distance
+- the choice of the number of neighbors allocated to each country
+
+It is also important to consider that the method is not symetrical because a country i can be the nearest neighbor of j but k is the nearest neighbor of i. So we have to introduce a third choice which is to transform the matrix in a symetric one or not.
+
+As an example, we will extract from the CEPII database the distance between capital cities of each territory (**distcap**) and select the value **k=5** which means that we will consider the five nearest neighbors.
+
+
+```{r}
+cont<-links %>% select(iso3_o, iso3_d, distcap) %>% 
+                filter(iso3_o != iso3_d) %>%
+                group_by(iso3_o) %>% 
+                arrange (iso3_o, distcap) %>%
+                mutate(rnk=rank(distcap)) %>%
+                filter(rnk<6)
+  
+
+kable(head(cont,10), caption = "Nearest neighbors based on CEPII distance between capitals")
+```
+
+We proceed now to the symetrisation of the matrix which will increase the number of links of some states to a value greater than 5.
+
+```{r}
+conti <- cont %>% select(iso3_i=iso3_o,iso3_j = iso3_d)
+contj <- cont %>% select(iso3_i=iso3_d,iso3_j = iso3_o)
+cont<-rbind(conti,contj) %>% unique()
+```
+
+We can produce a map of the number of links for each country of our database.
+
+
+```{r}
+tabcont<-cont %>% group_by(iso3=iso3_i) %>% summarise(nbcont=n())
+mapctr<-st_centroid(map,of_largest_polygon = T)
+mapctr<-mapctr %>% left_join(tabcont) 
+mapctr$nbcont[is.na(mapctr$nbcont)]<-0
+
+mf_map(map, type="base",col="lightyellow")
+mf_map(mapctr,type="prop",col="red",
+       var = "nbcont",
+       symbol = "square",
+       inches=0.05,
+       leg_title = "number of links",
+       leg_pos = "topleft")
+mf_map(mapctr[mapctr$nbcont==0,], type="base", pch=4, col="blue", add=T, cex=0.6)
+mf_layout(title = "Symetric nearest neighbours (k=5) in 2019",
+          frame=T,
+          credits = "Source : CEPII gravity database",
+          arrow=F)
+```
+
+
+The distribution of neighbors is more regular with a minimum of 5 (our initial choice) and a maximum of 10 (due to the symetrization of the matrix).
+
+
+```{r}
+distbord<-mapctr %>% st_drop_geometry %>% group_by(nbcont) %>% summarise(n = n())
+ggplot(mapctr) +aes(x=nbcont) + geom_bar() +
+  scale_x_continuous("Number of borders") +
+  scale_y_continuous("Number of countries") +
+  ggtitle("Frequency of borders contiguity in 2019")
+
+```
+
+
+The resulting network is made of a single component which was not necessarily an obvious result. With a lower value of K, we would have probably obtained a more fragmented network with isolated components in Pacific or separation between the old and the new continents (that are connected via Greenland).
+
+
+```{r, echo=FALSE, eval=FALSE}
+codes<-unique(c(cont$iso3_i,cont$iso3_j))
+nodes<-data.frame(id=codes, label=codes)
+
+edges <- cont %>%
+         filter(iso3_i > iso3_j) %>%
+        select(from = iso3_i, to = iso3_j)
+
+g<-visNetwork(nodes, edges)
+saveRDS(g,"data/gravity/knn5_net.RDS")
+```
+
+
+```{r}
+g<-readRDS("data/gravity/knn5_net.RDS")
+g
+```
+
+
+From a geopolitical point of view, it is interesting to observe that the network is organized in strongly connected components linked by bridges that are country with high level of betweeness like Turkey, Mali, Greenland ... It should be possible to demonstrate that those countries with high level of betweeness are generally strategic places where crises and conflict are likely to take place. But of course this result has to be balanced by the fact that the different nodes does not have the same weight in international affairs and we can propose alternative methods taking into account the power of countries and the intensity of flows that link them. 
