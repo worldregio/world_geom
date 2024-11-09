@@ -1,0 +1,160 @@
+---
+title: "Geopolitical network"
+format: 
+  html:
+    embed-resources: true
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, widgetframe_widgetsdir = 'widgets')
+library(sf)
+library(dplyr)
+library(mapsf)
+library(cartography)
+library(visNetwork, quietly = TRUE)
+library(widgetframe)
+```
+
+
+# Introduction
+
+
+One of the central problem of the worldregio project is to propose methods of regionalization based on the division of a network of states into sub-networks (components) according to a dual criteria :
+
+-   **geometric proximity** : the components should fulfill a first condition of proximity in the graph
+-   **attribute proximity** : the components should fulfill a condition of similarity, level of interaction, etc. which is supposed to be independent from their geometric proximity.
+
+
+The definition of a **geopolitical network** at world level implies the joint definition of two lists of objects :
+
+-   a finite list of political units called *states*
+-   a finite list of relations between political units called *borders*
+
+Notice that *states* and *borders* are used here in the abstract sense of *edges* and *vertices* which means that they do not necessary fit with the common sense idea.
+
+# A. GEOPOLITICAL VERTICES
+
+## Which list of states ?
+
+### Contested territories
+
+The definition of a finite list of states will necessarily be complicated because many *contested territories* around the world are not recognized by all countries of the world and are therefore difficult to define in terms of geometry and are missing in the databases where the attributes used for regionalization are available.
+
+Many list of countries are available in open source mapping packages (*gadm*, *natural earth*, ...) but with different lists of countries and also different geometries !
+
+
+-   **Taiwan** : the territory is relatively well defined but the country is not present in UN official databases because China consider it as a province of China. But in other databases (e.g. about trade), Taiwan exists.
+-   **Northern Cyprus** : the territory is recognized as a state only by Turkey. The EU consider it as an occupied part of Cyprus.
+-   **Abkhazia, Southern Ossetia, Transnitria, ...** are de facto states recognized by Russia.
+-   **Kosovo** : not recognized by all member states of EU
+-   ...
+
+### Historical evolution
+
+Another problem is the changing list of states over the period of observation. We will analyzed this problem in a separated chapter. 
+
+
+
+## Which geometry of states ?
+
+Admitting that we have succeeded in the definition of a finite list of states, another problem will occur concerning the geometry of states which is generally not limited to a single polygon but can generally be defined as a multipolygon which can include very remote pieces of territory. According to the list of pieces of territory that we consider, the network of borders will be different and the results of the regionalization procedure can be heavily modified.
+
+```{r, echo=FALSE, eval=TRUE}
+library(geodata)
+map<-world(resolution=5, path=tempdir())
+m<-st_as_sf(map)
+
+```
+
+### The case of Germany
+
+```{r}
+stalist <- "DEU"
+xref<-13
+yref<-52
+mycrs<-paste("+proj=laea +x_0=0 +y_0=0 +lon_0=",xref," +lat_0=",yref,sep="")
+map<-st_transform(m,mycrs)
+sel<-map %>% filter(GID_0 %in% stalist)
+mf_theme("agolalight")
+mf_map(sel, type="base")
+mf_map(map, type="base", col="gray80",add=T)
+mf_map(sel, type="base", col="lightyellow", border="red", add=T)
+mf_label(sel,var = "GID_0", halo = T,cex=0.6, col="red")
+mf_layout(title = "Geopolitical vertices : the case of Germany",
+          credits = "source : geodata",
+          arrow=FALSE,
+          scale=TRUE,
+          frame=TRUE)
+
+```
+
+Germany is an ideal situation where the state is made of a single polygon (except some nearby islands like Rügen) and where we can easily provide a list of 9 countries sharing a common terrestrial border (Denmark, The Nethetherlands, Belgium, Luxembourg, France, Switzerland, Austria, Czech republic, Poland).
+
+
+
+### The case of Denmark
+
+```{r}
+stalist<-c("DNK","GRL")
+xref<--10
+yref<-62
+mycrs<-paste("+proj=laea +x_0=0 +y_0=0 +lon_0=",xref," +lat_0=",yref,sep="")
+map<-st_transform(m,mycrs)
+sel<-map %>% filter(GID_0 %in% stalist)
+mf_theme("agolalight")
+mf_map(sel, type="base")
+mf_map(map, type="base", col="gray80",add=T)
+mf_map(sel, type="base", col="lightyellow", border="red", add=T)
+mf_label(sel,var = "GID_0", halo = T,cex=0.6, col="red")
+
+mf_layout(title = "Geopolitical vertices : the case of Denmark",
+          credits = "source : geodata",
+          arrow=FALSE,
+          scale=TRUE,
+          frame=TRUE)
+```
+
+The case of Denmark is more difficult because we have clearly a decision to take on the case of Greenland. Is it a part of Denmark or is it a separated country ? 
+
+::: {.callout-note collapse="true" title="Is Greenland an autonomous country ?"}
+
+*Greenland is an autonomous country within the Kingdom of Denmark. Although Greenland is geographically a part of the North American continent, it has been politically and culturally associated with Europe for about a millennium. Since 1721, Denmark has held colonies in Greenland, but the country was made part of Denmark in 1953. In 1979 Denmark granted Home Rule to Greenland, and in 2009 expanded Self Rule was inaugurated, transferring yet more decision making power and more responsibilities to the Greenlandic government. Under the new structure, gradually Greenland can assume more and more responsibilities from Denmark, when it is ready for it.*
+
+
+**Source** : [Visit Greenland](https://visitgreenland.com/articles/10-facts-nellie-huang/) )
+:::
+
+In the case of aggregation of Denmark and greenland in a single spatial unit, it is interesting to observe that the definition of the centroid of the multipolygon would probably be located in the center of the inlandsis as the algorithm will generally choose the *center of largest polygon* ...
+
+## The case of France
+
+```{r}
+stalist<-c("FRA","GUF","GLP","MTQ","REU","PYF","NCL","SPM","ATF")
+xref<-2
+yref<-49
+mycrs<-paste("+proj=laea +x_0=0 +y_0=0 +lon_0=",xref," +lat_0=",yref,sep="")
+map<-st_transform(m,mycrs)
+sel<-map %>% filter(GID_0 %in% stalist)
+mf_theme("agolalight")
+mf_map(sel, type="base")
+mf_map(map, type="base", col="gray80",add=T)
+mf_map(sel, type="base", col="lightyellow", border="red", add=T)
+mf_label(sel,var = "GID_0", halo = T,cex=0.6, col="red")
+mf_layout(title = "Geopolitical vertices : the case of France",
+          credits = "source : geodata",
+          arrow=FALSE,
+          scale=TRUE,
+          frame=TRUE)
+```
+
+France - as well as UK - are obviously very difficult cases because of the great number of so-called *remote territories* inherited from the colonial period. This remote territories are characterized by very different juridic status and it is impossible to adopt a common rule of decision for all of them. 
+
+::: {.callout-note collapse="true" title="Overseas France : 13 territories with different statuses"}
+
+*Overseas France (French: *France d'outre-mer*, also France ultramarine)[note 3] consists of 13 French territories outside Europe, mostly the remnants of the French colonial empire that remained a part of the French state under various statuses after decolonisation. Most, but not all, are part of the European Union.*
+
+*"Overseas France" is a collective name; while used in everyday life in France, it is not an administrative designation in its own right. Instead, the five overseas regions have exactly the same administrative status as the thirteen metropolitan regions; the five overseas collectivities are semi-autonomous; and New Caledonia is an autonomous territory. Overseas France includes island territories in the Atlantic, Pacific and Indian Oceans, French Guiana on the South American continent, and several peri-Antarctic islands as well as a claim in Antarctica. Excluding the district of Adélie Land, where French sovereignty is effective de jure by French law, but where the French exclusive claim on this part of Antarctica is frozen by the Antarctic Treaty (signed in 1959), overseas France covers a land area of 120,396 km2 (46,485 sq mi) and accounts for 18.0% of the French Republic's land territory.Its exclusive economic zone (EEZ) of 9,825,538 km2 (3,793,661 sq mi) accounts for 96.7% of the EEZ of the French Republic.*
+
+**Source** : [Overseas France in English Wikipedia, 9 nov. 2024](https://en.wikipedia.org/wiki/Overseas_France)
+:::

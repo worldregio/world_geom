@@ -10,6 +10,8 @@ website:
         text: "Index"
       - href: author.qmd
         text: "Author"
+      - href: geopolitical_network.qmd
+        text: "Geopolitical network"        
     right: 
       - icon: github # add icons as navbar buttons
         href: https://github.com/worldregio/pew_opi
