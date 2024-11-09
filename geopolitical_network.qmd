@@ -3,11 +3,12 @@ title: "Geopolitical network"
 format: 
   html:
     embed-resources: true
+bibliography: references.bib
 ---
-
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, widgetframe_widgetsdir = 'widgets')
+library(knitr)
 library(sf)
 library(dplyr)
 library(mapsf)
@@ -16,15 +17,12 @@ library(visNetwork, quietly = TRUE)
 library(widgetframe)
 ```
 
-
-# Introduction
-
+## Introduction
 
 One of the central problem of the worldregio project is to propose methods of regionalization based on the division of a network of states into sub-networks (components) according to a dual criteria :
 
 -   **geometric proximity** : the components should fulfill a first condition of proximity in the graph
 -   **attribute proximity** : the components should fulfill a condition of similarity, level of interaction, etc. which is supposed to be independent from their geometric proximity.
-
 
 The definition of a **geopolitical network** at world level implies the joint definition of two lists of objects :
 
@@ -33,30 +31,176 @@ The definition of a **geopolitical network** at world level implies the joint de
 
 Notice that *states* and *borders* are used here in the abstract sense of *edges* and *vertices* which means that they do not necessary fit with the common sense idea.
 
-# A. GEOPOLITICAL VERTICES
+## A. GEOPOLITICAL VERTICES
 
-## Which list of states ?
-
-### Contested territories
+### Which list of units ?
 
 The definition of a finite list of states will necessarily be complicated because many *contested territories* around the world are not recognized by all countries of the world and are therefore difficult to define in terms of geometry and are missing in the databases where the attributes used for regionalization are available.
 
-Many list of countries are available in open source mapping packages (*gadm*, *natural earth*, ...) but with different lists of countries and also different geometries !
+Many list of countries are available in open source mapping packages but with different lists of countries and also different geometries !
 
+#### The world of gadm
+
+The map of the world provided by [gadm](https://gadm.org/) is widely used as it provides data at different levels of administrative divisions and with different resolutions. We can therefore analyze what is proposed at the top level.
+
+```{r, echo=FALSE, eval=TRUE}
+library(geodata, quietly = T, verbose = F)
+map<-world(resolution=5, path=tempdir())
+m<-st_as_sf(map)
+```
+
+We find 231 territorial units that can be states member of United Nations but also non recognized territories .
 
 -   **Taiwan** : the territory is relatively well defined but the country is not present in UN official databases because China consider it as a province of China. But in other databases (e.g. about trade), Taiwan exists.
 -   **Northern Cyprus** : the territory is recognized as a state only by Turkey. The EU consider it as an occupied part of Cyprus.
 -   **Abkhazia, Southern Ossetia, Transnitria, ...** are de facto states recognized by Russia.
 -   **Kosovo** : not recognized by all member states of EU
--   ...
 
-### Historical evolution
+One of the most original unit propose by this database is **Akrotiri and Dekalia** which is a the territory of two military bases of UK located in the south of Cyprus.
 
-Another problem is the changing list of states over the period of observation. We will analyzed this problem in a separated chapter. 
+```{r}
+stalist <- c("XAD", "CYP","XNC")
+xref<-33
+yref<-34
+mycrs<-paste("+proj=laea +x_0=0 +y_0=0 +lon_0=",xref," +lat_0=",yref,sep="")
+map<-st_transform(m,mycrs)
+sel<-map %>% filter(GID_0 %in% stalist)
+mf_theme("agolalight")
+mf_map(sel, type="typo", var="NAME_0")
+mf_layout(title = "Division of the isle of Cyprus in geopolitical units",
+          credits = "source : Gadm, 2024",
+          arrow=FALSE,
+          scale=TRUE,
+          frame=TRUE)
+
+```
+
+::: {.callout-note collapse="true" title="Akrotiri and Dhekelia"}
+Akrotiri and Dhekelia , officially the Sovereign Base Areas of Akrotiri and Dhekelia\[2\] (SBA),\[a\] is a British Overseas Territory on the island of Cyprus. The areas, which include British military bases and installations that were formerly part of the Crown colony of Cyprus, were retained by the British under the 1960 treaty of independence signed by the United Kingdom, Greece, Turkey and representatives from the Greek and Turkish Cypriot communities. The territory serves as a station for signals intelligence and is thereby part of the United Kingdom's surveillance-gathering work in the Mediterranean and the Middle East.
+
+**Source** : [Akrotiri and Dhekelia, in English Wikipedia, 9 nov. 2024](ttps://en.wikipedia.org/wiki/Akrotiri_and_Dhekelia)
+:::
+
+#### The world of cshapes
+
+A more precise and complete databases can be found in the pakage cshape which provide an historical database of geopolitical divisions between 1886 and 2019. This database has been established by researchers of the correlated of war project with the purpose of analyzig the origin of conflicts and trying to prevent them @schvitz2021.
+
+We will firstly examine the situation of the world in 2019 according to this database.
 
 
 
-## Which geometry of states ?
+```{r}
+library(cshapes)
+# Situation in 1948
+t<-as.Date("2019-01-01")
+map<-cshp(date = t,dependencies = T) %>% st_transform("ESRI:54018")
+map$status<-as.factor(map$status)
+mf_init(map)
+mf_map(map, type="typo", var="status",leg_pos = "left",add=T)
+mf_layout(title = "Political map of the world in 2019",
+          credits = "CShapes 2.0 Dataset, Version: 2.0",
+          frame = T,scale = T, arrow=T)
+```
+
+This map is limited to 181 territorial units, from which 7 are considered as "colony" :
+
+```{r}
+tab<-st_drop_geometry(map) %>% filter(status=="colony") %>%
+     select(2:7)
+kable(tab, caption = "Territory declared as 'colony' by cshapes")
+```
+
+We can notice that the number of territorial units is much smaller than in the case of gadm database. Many countries are missing as well as many overseas territories, in particular from UK. The 'colony' that are mentionned are in fact part of nation states (France, USA) that are allowed to participate to national elections and are in practice strongly linked to the nations they belong to. 
+
+
+#### The world of Natural Earth
+
+As third and last example, we can also analyze the world presented in the famous package `rnaturalearth` and the complementary package `rnaturaleathdata`. The map provided by this package are produced by volunteers and coordinated by the North American Cartographic Information Society (NACIS). 
+
+::: {.callout-note collapse="true" title="What is Natural Earth ?"}
+
+*Natural Earth is a public domain map dataset available at 1:10m, 1:50m, and 1:110 million scales. Featuring tightly integrated vector and raster data, with Natural Earth you can make a variety of visually pleasing, well-crafted maps with cartography or GIS software. Natural Earth was built through a collaboration of many volunteers and is supported by NACIS (North American Cartographic Information Society), and is free for use in any type of project (see our Terms of Use page for more information).*
+
+**Source**: [Natural Earth website](https://www.naturalearthdata.com/)
+:::
+
+This database is much more complex because they are a lot of option for the creation of the map, depending of the request on the type of unit and the scale of generalization. If we use the smallest level of resolution (10 meters) we can fo example obtain 298 territorial units.
+
+```{r}
+library(rnaturalearth)
+library(rnaturalearthdata)
+map<-ne_countries(type = "map_units",scale = 10)
+x<-st_drop_geometry(map) %>% arrange(pop_est) %>% select(name_long, sovereignt, type)
+kable(head(x,10))
+
+```
+
+
+### Which time period ?
+
+Another problem is the changing list of states over the period of observation. We can use the another time the package `cshapes` to illustrate the changing divisions of the world in terms of geometry and political status.
+
+#### Situation in 1948
+
+```{r}
+library(cshapes)
+# Situation in 1948
+t<-as.Date("1948-01-01")
+map<-cshp(date = t,dependencies = T) %>% st_transform("ESRI:54018")
+map$status<-as.factor(map$status)
+mf_init(map)
+mf_map(map, type="typo", var="status",leg_pos = "left",add=T)
+mf_layout(title = "Political map of the world in 1948",
+          credits = "CShapes 2.0 Dataset, Version: 2.0",
+          frame = T,scale = T, arrow=T)
+```
+
+#### Situation in 1968
+
+```{r}
+library(cshapes)
+# Situation in 1948
+t<-as.Date("1968-01-01")
+map<-cshp(date = t,dependencies = T) %>% st_transform("ESRI:54018")
+map$status<-as.factor(map$status)
+mf_init(map)
+mf_map(map, type="typo", var="status",leg_pos = "left",add=T)
+mf_layout(title = "Political map of the world in 1968",
+          credits = "CShapes 2.0 Dataset, Version: 2.0",
+          frame = T,scale = T, arrow=T)
+```
+
+#### Situation in 1988
+
+```{r}
+library(cshapes)
+# Situation in 1948
+t<-as.Date("1988-01-01")
+map<-cshp(date = t,dependencies = T) %>% st_transform("ESRI:54018")
+map$status<-as.factor(map$status)
+mf_init(map)
+mf_map(map, type="typo", var="status",leg_pos = "left",add=T)
+mf_layout(title = "Political map of the world in 1988",
+          credits = "CShapes 2.0 Dataset, Version: 2.0",
+          frame = T,scale = T, arrow=T)
+```
+
+#### Situation in 2018
+
+```{r}
+library(cshapes)
+# Situation in 1948
+t<-as.Date("2018-01-01")
+map<-cshp(date = t,dependencies = T) %>% st_transform("ESRI:54018")
+map$status<-as.factor(map$status)
+mf_init(map)
+mf_map(map, type="typo", var="status",leg_pos = "left",add=T)
+mf_layout(title = "Political map of the world in 2018",
+          credits = "CShapes 2.0 Dataset, Version: 2.0",
+          frame = T,scale = T, arrow=T)
+```
+
+### Which geometry ?
 
 Admitting that we have succeeded in the definition of a finite list of states, another problem will occur concerning the geometry of states which is generally not limited to a single polygon but can generally be defined as a multipolygon which can include very remote pieces of territory. According to the list of pieces of territory that we consider, the network of borders will be different and the results of the regionalization procedure can be heavily modified.
 
@@ -67,7 +211,7 @@ m<-st_as_sf(map)
 
 ```
 
-### The case of Germany
+#### The case of Germany
 
 ```{r}
 stalist <- "DEU"
@@ -91,9 +235,7 @@ mf_layout(title = "Geopolitical vertices : the case of Germany",
 
 Germany is an ideal situation where the state is made of a single polygon (except some nearby islands like Rügen) and where we can easily provide a list of 9 countries sharing a common terrestrial border (Denmark, The Nethetherlands, Belgium, Luxembourg, France, Switzerland, Austria, Czech republic, Poland).
 
-
-
-### The case of Denmark
+#### The case of Denmark
 
 ```{r}
 stalist<-c("DNK","GRL")
@@ -115,19 +257,17 @@ mf_layout(title = "Geopolitical vertices : the case of Denmark",
           frame=TRUE)
 ```
 
-The case of Denmark is more difficult because we have clearly a decision to take on the case of Greenland. Is it a part of Denmark or is it a separated country ? 
+The case of Denmark is more difficult because we have clearly a decision to take on the case of Greenland. Is it a part of Denmark or is it a separated country ?
 
 ::: {.callout-note collapse="true" title="Is Greenland an autonomous country ?"}
-
 *Greenland is an autonomous country within the Kingdom of Denmark. Although Greenland is geographically a part of the North American continent, it has been politically and culturally associated with Europe for about a millennium. Since 1721, Denmark has held colonies in Greenland, but the country was made part of Denmark in 1953. In 1979 Denmark granted Home Rule to Greenland, and in 2009 expanded Self Rule was inaugurated, transferring yet more decision making power and more responsibilities to the Greenlandic government. Under the new structure, gradually Greenland can assume more and more responsibilities from Denmark, when it is ready for it.*
-
 
 **Source** : [Visit Greenland](https://visitgreenland.com/articles/10-facts-nellie-huang/) )
 :::
 
 In the case of aggregation of Denmark and greenland in a single spatial unit, it is interesting to observe that the definition of the centroid of the multipolygon would probably be located in the center of the inlandsis as the algorithm will generally choose the *center of largest polygon* ...
 
-## The case of France
+#### The case of France
 
 ```{r}
 stalist<-c("FRA","GUF","GLP","MTQ","REU","PYF","NCL","SPM","ATF")
@@ -148,11 +288,10 @@ mf_layout(title = "Geopolitical vertices : the case of France",
           frame=TRUE)
 ```
 
-France - as well as UK - are obviously very difficult cases because of the great number of so-called *remote territories* inherited from the colonial period. This remote territories are characterized by very different juridic status and it is impossible to adopt a common rule of decision for all of them. 
+France - as well as UK - are obviously very difficult cases because of the great number of so-called *remote territories* inherited from the colonial period. This remote territories are characterized by very different juridic status and it is impossible to adopt a common rule of decision for all of them.
 
 ::: {.callout-note collapse="true" title="Overseas France : 13 territories with different statuses"}
-
-*Overseas France (French: *France d'outre-mer*, also France ultramarine)[note 3] consists of 13 French territories outside Europe, mostly the remnants of the French colonial empire that remained a part of the French state under various statuses after decolonisation. Most, but not all, are part of the European Union.*
+*Overseas France (French:* France d'outre-mer*, also France ultramarine)\[note 3\] consists of 13 French territories outside Europe, mostly the remnants of the French colonial empire that remained a part of the French state under various statuses after decolonisation. Most, but not all, are part of the European Union.*
 
 *"Overseas France" is a collective name; while used in everyday life in France, it is not an administrative designation in its own right. Instead, the five overseas regions have exactly the same administrative status as the thirteen metropolitan regions; the five overseas collectivities are semi-autonomous; and New Caledonia is an autonomous territory. Overseas France includes island territories in the Atlantic, Pacific and Indian Oceans, French Guiana on the South American continent, and several peri-Antarctic islands as well as a claim in Antarctica. Excluding the district of Adélie Land, where French sovereignty is effective de jure by French law, but where the French exclusive claim on this part of Antarctica is frozen by the Antarctic Treaty (signed in 1959), overseas France covers a land area of 120,396 km2 (46,485 sq mi) and accounts for 18.0% of the French Republic's land territory.Its exclusive economic zone (EEZ) of 9,825,538 km2 (3,793,661 sq mi) accounts for 96.7% of the EEZ of the French Republic.*
 
