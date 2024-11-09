@@ -1,0 +1,5 @@
+---
+title: "Index"
+---
+
+This website propose different analysis of the polarisation of world opinion. It is based on a collection of data from the Global Attitude Survey realized by the Pew Research Center from 2002 to present.
