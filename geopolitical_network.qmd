@@ -514,3 +514,116 @@ g
 
 
 From a geopolitical point of view, it is interesting to observe that the network is organized in strongly connected components linked by bridges that are country with high level of betweeness like Turkey, Mali, Greenland ... It should be possible to demonstrate that those countries with high level of betweeness are generally strategic places where crises and conflict are likely to take place. But of course this result has to be balanced by the fact that the different nodes does not have the same weight in international affairs and we can propose alternative methods taking into account the power of countries and the intensity of flows that link them. 
+
+
+### Delaunay-Voronoï tesselation
+
+
+An alternative family of solution is the creation of a Delaunay-Voronoï tesselation based on the edges corresponding to the centers of states.
+
+If we consider that the earth is "flat", the problemis very simple because we just need to put the $(x,y)$ coordinates of the center of states and apply some functions of the `spdep` package. We obtain in a few seconds the list of states linked to each edge :
+
+
+```{r}
+map = st_transform(map, crs = "+proj=moll +lon_0=0")
+don.xy <-st_coordinates(st_centroid(map))
+row.names(don.xy)<-map$iso3
+
+codei<-data.frame(i = 1:dim(map)[1], iso3i=map$iso3)
+codej<-data.frame(j = 1:dim(map)[1], iso3j=map$iso3)
+
+library(spdep)
+don.edge <-
+  don.xy %>%
+  tri2nb %>%
+  nb2listw(style = "B") %>%
+  listw2sn 
+
+res<-don.edge
+class(res)<-"data.frame"
+res<-res %>%
+  select(i=from, j=to) %>%
+  left_join(codei) %>%
+  left_join(codej)
+kable(head(res,10), caption = "Liste des liens (non pondérés)")
+```
+
+
+We can then visualize the graph on a world map of states :
+
+```{r}
+
+mf_map(map$geometry, col="lightyellow", border="gray", type="base")
+points(don.xy[,1],don.xy[,2],asp=1, pch=20, 
+     xlab="y",ylab="x", main="Topologie du graphe de contiguïté")
+
+for (i in 1:dim(don.edge)[1]) {
+  o<-don.edge$from[i]
+  d<-don.edge$to[i]
+  segments(don.xy[o,1], don.xy[o,2], don.xy[d,1],don.xy[d,2], col="red")
+}
+points(don.xy[,1],don.xy[,2],asp=1, pch=20, col="black")
+text(don.xy[,1],don.xy[,2],row.names(don.xy),cex=0.4, col="blue", pos=3)
+mf_layout("Triangulation of Atlantic side", frame=T)
+
+```
+
+The result is interesting because they are no more isolated states and some links are crossing the seas and ocean in order to cover all the world. But some issues can be pointed.
+
+1. Very little territories can obtain a dramatic importance when they are isolated island in the middle of oceanic area. For example the small islands of Saint Helena (*SHN*) , Cabo Verde (*CPV*) and Saint-Pierre et Miquelon (*SPM*) appears as gatekeepers between Americas and Europa or Africa. 
+
+2. The tesselation has been made on a planar surface which exclude links across the Pacific Ocean. If we had chosen the same projection but with another longitude of reference, we would have observed links across the Pacific, linking America and Asia.
+
+```{r}
+map = st_transform(map, crs = "+proj=moll +lon_0=180")
+don.xy <-st_coordinates(st_centroid(map))
+row.names(don.xy)<-map$iso3
+
+codei<-data.frame(i = 1:dim(map)[1], iso3i=map$iso3)
+codej<-data.frame(j = 1:dim(map)[1], iso3j=map$iso3)
+
+library(spdep)
+don.edge <-
+  don.xy %>%
+  tri2nb %>%
+  nb2listw(style = "B") %>%
+  listw2sn 
+
+res<-don.edge
+class(res)<-"data.frame"
+res<-res %>%
+  select(i=from, j=to) %>%
+  left_join(codei) %>%
+  left_join(codej)
+#kable(head(res,10), caption = "Liste des liens (non pondérés)")
+
+mf_map(map$geometry, col="lightyellow", border="gray", type="base")
+points(don.xy[,1],don.xy[,2],asp=1, pch=20, 
+     xlab="y",ylab="x", main="Topologie du graphe de contiguïté")
+
+for (i in 1:dim(don.edge)[1]) {
+  o<-don.edge$from[i]
+  d<-don.edge$to[i]
+  segments(don.xy[o,1], don.xy[o,2], don.xy[d,1],don.xy[d,2], col="red")
+}
+points(don.xy[,1],don.xy[,2],asp=1, pch=20, col="black")
+text(don.xy[,1],don.xy[,2],row.names(don.xy),cex=0.4, col="blue", pos=3)
+mf_layout("Triangulation of Pacific side", frame=T)
+```
+
+3. The result of this method is strongly from the location of the center of the states chosen (as it was the case for the k-nearest neighbour method). We have chosen here the center of the largest polygon but we would have obtained different results if we had chosen the capital city (Cf. the case of Russia).
+
+
+As a whole, the method is interesting but should be improved in different ways :
+
+1. Computing Delaunay-Voronoï directly on a spherical object. Our research on internet reveals that many authors has proposed solution to this problem with applications in the languages Python or Observable. You can for example have a look at [d3-geo-voronoi application](https://github.com/Fil/d3-geo-voronoi/).
+
+2. Better results could probably be obtained by the use of multiple centers inside each state. As an example you can look at a [map of triangulation of world airports](https://observablehq.com/@d3/world-airports-voronoi) which could be eventually aggregated at national level in order to obtain an international network.
+
+![Spherical Delaunay-Voronoï triangulation applied to the distribution of world airports](media/world_delaunay_airport.jpg){width="400"}
+
+
+
+
+
+
